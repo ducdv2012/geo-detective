@@ -1,110 +1,284 @@
-import { useCallback, useEffect, useRef } from 'react'
+import { useCallback, useEffect, useRef } from "react";
+import { appConfig } from "../../app.config";
 
-type AudioContextConstructor = typeof AudioContext
+type AudioContextConstructor = typeof AudioContext;
+
+type ToneOptions = {
+  attack?: number;
+  ambient?: boolean;
+  endFrequency?: number;
+  type?: OscillatorType;
+};
 
 export function useSoundEffects(enabled: boolean) {
-  const contextRef = useRef<AudioContext | null>(null)
-  const ambientTimerRef = useRef<number | null>(null)
-  const ambientDayRef = useRef(1)
-  const ambientOscillatorsRef = useRef(new Set<OscillatorNode>())
+  const contextRef = useRef<AudioContext | null>(null);
+  const soundtrackTimerRef = useRef<number | null>(null);
+  const soundtrackDayRef = useRef(1);
+  const soundtrackBarRef = useRef(0);
+  const soundtrackSourcesRef = useRef(new Set<AudioScheduledSourceNode>());
 
   const ensureContext = useCallback(() => {
-    if (typeof window === 'undefined') return null
-    const AudioCtor = (window.AudioContext || (window as typeof window & { webkitAudioContext?: AudioContextConstructor }).webkitAudioContext)
-    if (!AudioCtor) return null
+    if (typeof window === "undefined") return null;
+    const AudioCtor =
+      window.AudioContext ||
+      (
+        window as typeof window & {
+          webkitAudioContext?: AudioContextConstructor;
+        }
+      ).webkitAudioContext;
+    if (!AudioCtor) return null;
     try {
-      contextRef.current ??= new AudioCtor()
-      if (contextRef.current.state === 'suspended') void contextRef.current.resume()
-      return contextRef.current
+      contextRef.current ??= new AudioCtor();
+      if (contextRef.current.state === "suspended")
+        void contextRef.current.resume();
+      return contextRef.current;
     } catch {
-      return null
+      return null;
     }
-  }, [])
+  }, []);
 
-  const tone = useCallback((
-    frequency: number,
-    start: number,
-    duration: number,
-    gain = .045,
-    type: OscillatorType = 'sine',
-    ambient = false,
-  ) => {
-    if (!enabled) return
-    const context = ensureContext()
-    if (!context) return
-    const oscillator = context.createOscillator()
-    const volume = context.createGain()
-    oscillator.type = type
-    oscillator.frequency.setValueAtTime(frequency, context.currentTime + start)
-    volume.gain.setValueAtTime(0, context.currentTime + start)
-    volume.gain.linearRampToValueAtTime(gain, context.currentTime + start + .015)
-    volume.gain.exponentialRampToValueAtTime(.0001, context.currentTime + start + duration)
-    oscillator.connect(volume).connect(context.destination)
-    if (ambient) {
-      ambientOscillatorsRef.current.add(oscillator)
-      oscillator.onended = () => ambientOscillatorsRef.current.delete(oscillator)
-    }
-    oscillator.start(context.currentTime + start)
-    oscillator.stop(context.currentTime + start + duration)
-  }, [enabled, ensureContext])
+  const trackSource = useCallback(
+    (source: AudioScheduledSourceNode, ambient: boolean) => {
+      if (!ambient) return;
+      soundtrackSourcesRef.current.add(source);
+      source.onended = () => soundtrackSourcesRef.current.delete(source);
+    },
+    [],
+  );
+
+  const tone = useCallback(
+    (
+      frequency: number,
+      start: number,
+      duration: number,
+      gain = 0.045,
+      options: ToneOptions = {},
+    ) => {
+      if (!enabled) return;
+      const context = ensureContext();
+      if (!context) return;
+      const {
+        attack = 0.015,
+        ambient = false,
+        endFrequency,
+        type = "sine",
+      } = options;
+      const beginsAt = context.currentTime + start;
+      const oscillator = context.createOscillator();
+      const volume = context.createGain();
+      oscillator.type = type;
+      oscillator.frequency.setValueAtTime(frequency, beginsAt);
+      if (endFrequency)
+        oscillator.frequency.exponentialRampToValueAtTime(
+          endFrequency,
+          beginsAt + duration,
+        );
+      volume.gain.setValueAtTime(0.0001, beginsAt);
+      volume.gain.linearRampToValueAtTime(
+        gain,
+        beginsAt + Math.min(attack, duration * 0.45),
+      );
+      volume.gain.exponentialRampToValueAtTime(0.0001, beginsAt + duration);
+      oscillator.connect(volume).connect(context.destination);
+      trackSource(oscillator, ambient);
+      oscillator.start(beginsAt);
+      oscillator.stop(beginsAt + duration);
+    },
+    [enabled, ensureContext, trackSource],
+  );
+
+  const noiseBurst = useCallback(
+    (
+      start: number,
+      duration: number,
+      gain: number,
+      filterFrequency: number,
+      ambient = false,
+    ) => {
+      if (!enabled) return;
+      const context = ensureContext();
+      if (!context) return;
+      const beginsAt = context.currentTime + start;
+      const frameCount = Math.max(1, Math.ceil(context.sampleRate * duration));
+      const buffer = context.createBuffer(1, frameCount, context.sampleRate);
+      const channel = buffer.getChannelData(0);
+      for (let index = 0; index < channel.length; index += 1)
+        channel[index] = Math.random() * 2 - 1;
+
+      const source = context.createBufferSource();
+      const filter = context.createBiquadFilter();
+      const volume = context.createGain();
+      source.buffer = buffer;
+      filter.type = "highpass";
+      filter.frequency.setValueAtTime(filterFrequency, beginsAt);
+      volume.gain.setValueAtTime(gain, beginsAt);
+      volume.gain.exponentialRampToValueAtTime(0.0001, beginsAt + duration);
+      source.connect(filter).connect(volume).connect(context.destination);
+      trackSource(source, ambient);
+      source.start(beginsAt);
+      source.stop(beginsAt + duration);
+    },
+    [enabled, ensureContext, trackSource],
+  );
 
   const stopInvestigation = useCallback(() => {
-    if (ambientTimerRef.current !== null) window.clearInterval(ambientTimerRef.current)
-    ambientTimerRef.current = null
-    ambientOscillatorsRef.current.forEach((oscillator) => {
-      try { oscillator.stop() } catch { /* The note has already ended. */ }
-    })
-    ambientOscillatorsRef.current.clear()
-  }, [])
+    if (soundtrackTimerRef.current !== null)
+      window.clearInterval(soundtrackTimerRef.current);
+    soundtrackTimerRef.current = null;
+    soundtrackSourcesRef.current.forEach((source) => {
+      try {
+        source.stop();
+      } catch {
+        /* The sound has already ended. */
+      }
+    });
+    soundtrackSourcesRef.current.clear();
+    soundtrackBarRef.current = 0;
+  }, []);
 
-  const investigationPulse = useCallback(() => {
-    const day = ambientDayRef.current
-    const base = 52 + day * 7
-    const tension = .022 + day * .003
-    // Low continuous bed, a four-note noir motif, and a short radar accent.
-    tone(base, 0, 1.9, tension, 'triangle', true)
-    tone(base * 1.5, .12, .42, .014 + day * .002, 'sine', true)
-    tone(base * 1.78, .52, .38, .013 + day * .002, 'sine', true)
-    tone(base * 1.5, .92, .36, .014 + day * .002, 'sine', true)
-    tone(base * 2.12, 1.28, .28, .012 + day * .002, 'square', true)
-    tone(470 + day * 65, .22, .12, .016 + day * .002, 'square', true)
-    if (day >= 2) tone(165 + day * 22, 1.48, .25, .012, 'sawtooth', true)
-  }, [tone])
+  const investigationBar = useCallback(() => {
+    const day = soundtrackDayRef.current;
+    const barDuration = 5.6 - day * 0.4;
+    const beat = barDuration / 8;
+    const progression = [
+      { root: 73.42, minor: true },
+      { root: 58.27, minor: false },
+      { root: 65.41, minor: true },
+      { root: 55, minor: false },
+    ];
+    const harmony = progression[soundtrackBarRef.current % progression.length];
+    soundtrackBarRef.current += 1;
+    const thirdRatio = harmony.minor ? 1.1892 : 1.2599;
 
-  const startInvestigation = useCallback((day: number) => {
-    const normalizedDay = Math.min(3, Math.max(1, day))
-    if (enabled && ambientTimerRef.current !== null && ambientDayRef.current === normalizedDay) return
-    stopInvestigation()
-    if (!enabled || !ensureContext()) return
-    ambientDayRef.current = normalizedDay
-    investigationPulse()
-    const interval = 2200 - ambientDayRef.current * 180
-    ambientTimerRef.current = window.setInterval(investigationPulse, interval)
-  }, [enabled, ensureContext, investigationPulse, stopInvestigation])
+    // Sustained noir harmony replaces the old repeating lead melody.
+    [harmony.root, harmony.root * 1.5, harmony.root * 2 * thirdRatio].forEach(
+      (frequency, index) => {
+        tone(frequency, 0, barDuration + 0.12, 0.008 + day * 0.0015, {
+          ambient: true,
+          attack: 0.42,
+          type: index === 0 ? "triangle" : "sawtooth",
+        });
+      },
+    );
 
-  const unlock = useCallback(() => { void ensureContext() }, [ensureContext])
+    // A real bass line anchors the score without competing with the clues.
+    const bassPattern = [1, 1, 1.5, 1, 1, 1.5, thirdRatio, 1.5];
+    bassPattern.forEach((ratio, index) => {
+      if (index % 2 !== 0 && day === 1) return;
+      tone(
+        harmony.root * ratio,
+        index * beat,
+        beat * 0.72,
+        0.024 + day * 0.0025,
+        {
+          ambient: true,
+          attack: 0.025,
+          type: "triangle",
+        },
+      );
+    });
+
+    // Kick, snare and hi-hat turn the ambience into a complete soundtrack.
+    [0, 4, ...(day >= 2 ? [6] : [])].forEach((step) => {
+      tone(105, step * beat, 0.22, 0.055 + day * 0.004, {
+        ambient: true,
+        endFrequency: 42,
+        type: "sine",
+      });
+    });
+    [2, 6].forEach((step) => {
+      noiseBurst(step * beat, 0.16, 0.018 + day * 0.002, 900, true);
+      tone(175, step * beat, 0.12, 0.015, {
+        ambient: true,
+        endFrequency: 95,
+        type: "triangle",
+      });
+    });
+    Array.from({ length: day === 3 ? 16 : 8 }, (_, index) => index).forEach(
+      (step) => {
+        const subdivision = day === 3 ? beat / 2 : beat;
+        noiseBurst(
+          step * subdivision,
+          0.045,
+          step % 2 ? 0.0035 : 0.005,
+          4800,
+          true,
+        );
+      },
+    );
+
+    // Restrained radio pulses increase the pressure on later days.
+    if (day >= 2) {
+      [1, 3, 5, 7].forEach((step) => {
+        tone(720 + day * 80, step * beat, 0.055, 0.006 + day * 0.001, {
+          ambient: true,
+          type: "square",
+        });
+      });
+    }
+  }, [noiseBurst, tone]);
+
+  const startInvestigation = useCallback(
+    (day: number) => {
+      const normalizedDay = Math.min(
+        appConfig.gameplay.maxDays,
+        Math.max(1, day),
+      );
+      if (
+        enabled &&
+        soundtrackTimerRef.current !== null &&
+        soundtrackDayRef.current === normalizedDay
+      )
+        return;
+      stopInvestigation();
+      if (!enabled || !ensureContext()) return;
+      soundtrackDayRef.current = normalizedDay;
+      soundtrackBarRef.current = 0;
+      investigationBar();
+      const barMilliseconds = (5.6 - normalizedDay * 0.4) * 1000;
+      soundtrackTimerRef.current = window.setInterval(
+        investigationBar,
+        barMilliseconds,
+      );
+    },
+    [enabled, ensureContext, investigationBar, stopInvestigation],
+  );
+
+  const unlock = useCallback(() => {
+    void ensureContext();
+  }, [ensureContext]);
   const playCapture = useCallback(() => {
-    stopInvestigation()
-    tone(420, 0, .16, .035, 'square')
-    tone(620, .18, .22, .04, 'square')
-    tone(110, .48, .35, .07, 'triangle')
-  }, [stopInvestigation, tone])
+    stopInvestigation();
+    tone(420, 0, 0.16, 0.035, { type: "square" });
+    tone(620, 0.18, 0.22, 0.04, { type: "square" });
+    tone(110, 0.48, 0.35, 0.07, { type: "triangle" });
+  }, [stopInvestigation, tone]);
   const playEscape = useCallback(() => {
-    stopInvestigation()
-    tone(360, 0, .32, .04, 'sawtooth')
-    tone(260, .22, .4, .045, 'sawtooth')
-    tone(150, .55, .5, .035, 'triangle')
-  }, [stopInvestigation, tone])
+    stopInvestigation();
+    tone(360, 0, 0.32, 0.04, { type: "sawtooth" });
+    tone(260, 0.22, 0.4, 0.045, { type: "sawtooth" });
+    tone(150, 0.55, 0.5, 0.035, { type: "triangle" });
+  }, [stopInvestigation, tone]);
 
   const playClue = useCallback(() => {
-    tone(520, 0, .08, .02, 'square')
-    tone(780, .09, .16, .018, 'sine')
-  }, [tone])
+    tone(520, 0, 0.08, 0.02, { type: "square" });
+    tone(780, 0.09, 0.16, 0.018);
+  }, [tone]);
 
-  useEffect(() => () => {
-    stopInvestigation()
-    void contextRef.current?.close()
-  }, [stopInvestigation])
+  useEffect(
+    () => () => {
+      stopInvestigation();
+      void contextRef.current?.close();
+    },
+    [stopInvestigation],
+  );
 
-  return { unlock, startInvestigation, stopInvestigation, playCapture, playEscape, playClue }
+  return {
+    unlock,
+    startInvestigation,
+    stopInvestigation,
+    playCapture,
+    playEscape,
+    playClue,
+  };
 }
