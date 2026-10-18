@@ -13,6 +13,7 @@ import { fetchWeather } from './services/weather'
 import type { CaseRound, Country, Locale, PenaltyResult, RecoveryResult, ScoreResult } from './types'
 import { Onboarding } from './components/Onboarding'
 import { OutcomeCinematic, type CinematicKind } from './components/OutcomeCinematic'
+import { AchievementShare } from './components/AchievementShare'
 import { loadUiPreferences, saveUiPreferences } from './ui/preferences'
 import { useSoundEffects } from './ui/sound'
 
@@ -45,6 +46,7 @@ function App() {
   const [uiPreferences, setUiPreferences] = useState(() => loadUiPreferences(localStorage))
   const [showOnboarding, setShowOnboarding] = useState(() => !loadUiPreferences(localStorage).hasSeenOnboarding)
   const [cinematic, setCinematic] = useState<CinematicState | null>(null)
+  const [showAchievementShare, setShowAchievementShare] = useState(false)
   const randomRef = useRef(seededRandom(Date.now()))
   const evidenceHeadingRef = useRef<HTMLHeadingElement>(null)
   const resultHeadingRef = useRef<HTMLHeadingElement>(null)
@@ -326,7 +328,10 @@ function App() {
                   </div>
                 </div>
                 <div className="badge-vault">
-                  <small>{text.badges}</small>
+                  <div className="badge-vault-heading">
+                    <small>{text.badges}</small>
+                    <button onClick={() => setShowAchievementShare(true)}>{locale === 'vi' ? 'KHOE THÀNH TÍCH ↗' : 'SHARE RECORD ↗'}</button>
+                  </div>
                   {progress.earnedBadges.length ? (
                     <div className="badge-list">
                       {progress.earnedBadges.map((badgeId) => {
@@ -543,6 +548,11 @@ function App() {
               })}
             </section>
           )}
+          {state.status === 'won' && (
+            <button className="share-result-button" onClick={() => setShowAchievementShare(true)}>
+              <span>↗</span>{locale === 'vi' ? 'KHOE THÀNH TÍCH' : 'SHARE ACHIEVEMENT'}
+            </button>
+          )}
           {state.isRecovery && state.status === 'lost' && (
             <div className="recovery-safe"><span>✓</span>{text.noFurtherPenalty}</div>
           )}
@@ -579,6 +589,15 @@ function App() {
       )}
 
       {showOnboarding && <Onboarding locale={locale} onToggleLocale={toggleLocale} onClose={closeOnboarding} />}
+
+      {showAchievementShare && (
+        <AchievementShare
+          locale={locale}
+          progress={progress}
+          rank={rankProgress.current.label[locale]}
+          onClose={() => setShowAchievementShare(false)}
+        />
+      )}
 
       <footer><span>© 2026 GEO-DETECTIVE</span><span>{text.footer}</span></footer>
     </main>
