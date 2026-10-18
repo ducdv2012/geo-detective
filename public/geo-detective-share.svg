@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="1200" viewBox="0 0 1200 1200">
+  <defs>
+    <radialGradient id="glow" cx="70%" cy="40%" r="50%">
+      <stop offset="0" stop-color="#c8d68e" stop-opacity=".18"/>
+      <stop offset="1" stop-color="#0d0e0d" stop-opacity="0"/>
+    </radialGradient>
+    <pattern id="grid" width="60" height="60" patternUnits="userSpaceOnUse">
+      <path d="M60 0H0V60" fill="none" stroke="#c8d68e" stroke-opacity=".055"/>
+    </pattern>
+    <filter id="shadow"><feDropShadow dx="0" dy="8" stdDeviation="18" flood-color="#000" flood-opacity=".65"/></filter>
+  </defs>
+  <g transform="translate(0 285)">
+  <rect width="1200" height="630" fill="#0d0e0d"/>
+  <rect width="1200" height="630" fill="url(#grid)"/>
+  <rect width="1200" height="630" fill="url(#glow)"/>
+  <rect x="35" y="35" width="1130" height="560" fill="none" stroke="#d54a34" stroke-width="3"/>
+  <path d="M36 122H1164M700 35V595" stroke="#3b4038"/>
+  <text x="72" y="88" fill="#d54a34" font-family="Arial, sans-serif" font-size="18" font-weight="700" letter-spacing="4">INTERNATIONAL GEOGRAPHIC INVESTIGATION BUREAU</text>
+  <text x="72" y="225" fill="#f0eee3" font-family="Arial, sans-serif" font-size="78" font-weight="800" letter-spacing="4">GEO—DETECTIVE</text>
+  <text x="75" y="273" fill="#9a9d93" font-family="monospace" font-size="22" letter-spacing="2">TRUY TÌM TỘI PHẠM XUYÊN QUỐC GIA</text>
+  <rect x="72" y="330" width="510" height="138" fill="#151714" stroke="#4a5046" filter="url(#shadow)"/>
+  <text x="104" y="374" fill="#85877f" font-family="monospace" font-size="15" letter-spacing="3">HỒ SƠ THÀNH TÍCH</text>
+  <text x="104" y="415" fill="#c8d68e" font-family="Arial, sans-serif" font-size="32" font-weight="700">PHÁ ÁN · THĂNG CẤP</text>
+  <text x="104" y="453" fill="#c8d68e" font-family="Arial, sans-serif" font-size="32" font-weight="700">NHẬN HUY HIỆU</text>
+  <text x="75" y="540" fill="#74786f" font-family="monospace" font-size="17" letter-spacing="2">#GEODETECTIVE  ·  CASE STATUS: ACTIVE</text>
+  <g transform="translate(920 313)">
+    <circle r="205" fill="none" stroke="#c8d68e" stroke-opacity=".28" stroke-width="2"/>
+    <circle r="145" fill="none" stroke="#c8d68e" stroke-opacity=".18"/>
+    <circle r="82" fill="none" stroke="#c8d68e" stroke-opacity=".18"/>
+    <path d="M-205 0H205M0-205V205" stroke="#c8d68e" stroke-opacity=".12"/>
+    <path d="M0 0L143-143A205 205 0 0 1 195-63Z" fill="#c8d68e" fill-opacity=".09"/>
+    <circle cx="95" cy="-102" r="8" fill="#d54a34"/>
+    <circle cx="95" cy="-102" r="18" fill="none" stroke="#d54a34" stroke-opacity=".45"/>
+    <path d="M-50 88C-45 25 45 25 50 88V132H-50Z" fill="#bbbcae" fill-opacity=".78"/>
+    <ellipse cy="3" rx="34" ry="43" fill="#bbbcae" fill-opacity=".78"/>
+  </g>
+  <g transform="translate(732 505) rotate(-7)">
+    <rect width="340" height="66" fill="#0d0e0d" stroke="#d54a34" stroke-width="4"/>
+    <text x="26" y="44" fill="#d54a34" font-family="Arial, sans-serif" font-size="28" font-weight="800" letter-spacing="4">TARGET IDENTIFIED</text>
+  </g>
+  </g>
+</svg>

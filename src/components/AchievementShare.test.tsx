@@ -31,7 +31,7 @@ describe('AchievementShare', () => {
 
   it('does not open an unusable Facebook composer for a localhost game', () => {
     const open = vi.spyOn(window, 'open').mockImplementation(() => null)
-    render(<AchievementShare locale="vi" progress={createInitialProgress()} rank="Tập sự" onClose={() => undefined} />)
+    render(<AchievementShare locale="vi" progress={createInitialProgress()} rank="Tập sự" gameUrl="" onClose={() => undefined} />)
     fireEvent.click(screen.getByRole('button', { name: /facebook/i }))
     expect(open).not.toHaveBeenCalled()
     expect(screen.getAllByText(/game đang chạy cục bộ/i).length).toBeGreaterThan(0)
