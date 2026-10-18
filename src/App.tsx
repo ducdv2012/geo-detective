@@ -1,4 +1,5 @@
 import {
+  type ChangeEvent,
   useCallback,
   useEffect,
   useMemo,
@@ -111,12 +112,13 @@ function App() {
   const resolvingRef = useRef(false);
   const {
     unlock: unlockSound,
+    playSoundCheck,
     startInvestigation: startInvestigationSound,
     stopInvestigation: stopInvestigationSound,
     playCapture,
     playEscape,
     playClue,
-  } = useSoundEffects(uiPreferences.soundEnabled);
+  } = useSoundEffects(uiPreferences.soundEnabled, uiPreferences.musicVolume);
   const text = copy[locale];
   const recoveryActive =
     state.status === "briefing" ? progress.recoveryRequired : state.isRecovery;
@@ -333,12 +335,34 @@ function App() {
   }, [uiPreferences.soundEnabled, unlockSound]);
 
   const toggleSound = () => {
+    const enabling = !uiPreferences.soundEnabled;
     setUiPreferences((current) => {
       const updated = { ...current, soundEnabled: !current.soundEnabled };
       saveUiPreferences(localStorage, updated);
       return updated;
     });
-    if (!uiPreferences.soundEnabled) unlockSound();
+    if (enabling) {
+      unlockSound();
+      playSoundCheck(uiPreferences.musicVolume);
+    }
+  };
+
+  const changeMusicVolume = (event: ChangeEvent<HTMLInputElement>) => {
+    const musicVolume = Number(event.target.value);
+    const enabling = !uiPreferences.soundEnabled && musicVolume > 0;
+    setUiPreferences((current) => {
+      const updated = {
+        ...current,
+        musicVolume,
+        soundEnabled: musicVolume > 0 ? true : current.soundEnabled,
+      };
+      saveUiPreferences(localStorage, updated);
+      return updated;
+    });
+    if (enabling) {
+      unlockSound();
+      playSoundCheck(musicVolume);
+    }
   };
 
   const finishCinematic = useCallback(() => {
@@ -397,55 +421,81 @@ function App() {
     <main className="app-shell">
       <div className="grain" />
       <header className="topbar">
-        <div className="brand-mark" aria-hidden="true">
-          <span>G</span>
-          <i />
+        <div className="brand-lockup">
+          <div className="brand-mark" aria-hidden="true">
+            <span>G</span>
+            <i />
+          </div>
+          <div className="brand-copy">
+            <p>{text.eyebrow}</p>
+            <h1>{text.title}</h1>
+          </div>
         </div>
-        <div className="brand-copy">
-          <p>{text.eyebrow}</p>
-          <h1>{text.title}</h1>
+        <div className="topbar-actions">
+          <div className="agent-summary">
+            <div
+              className="rank-chip"
+              aria-label={`${text.reputation}: ${progress.reputation}`}
+            >
+              <small>{rankProgress.current.label[locale]}</small>
+              <strong>{progress.reputation} REP</strong>
+            </div>
+            <div
+              className="points-wallet"
+              aria-label={`${text.points}: ${progress.pointBalance}`}
+            >
+              <small>{text.points}</small>
+              <strong>{progress.pointBalance}</strong>
+              <span>PTS</span>
+            </div>
+          </div>
+          <nav className="header-tools" aria-label={locale === "vi" ? "Công cụ" : "Tools"}>
+            <button
+              className="utility-button help-button"
+              onClick={() => setShowOnboarding(true)}
+              aria-label={locale === "vi" ? "Mở hướng dẫn" : "Open tutorial"}
+            >
+              ?
+            </button>
+            <div className="audio-console">
+              <button
+                className="utility-button sound-toggle"
+                onClick={toggleSound}
+                aria-label={
+                  locale === "vi"
+                    ? uiPreferences.soundEnabled ? "Tắt âm thanh" : "Bật âm thanh"
+                    : uiPreferences.soundEnabled ? "Mute sound" : "Enable sound"
+                }
+                aria-pressed={uiPreferences.soundEnabled}
+              >
+                <span aria-hidden="true">{uiPreferences.soundEnabled ? "◖))" : "◖×"}</span>
+                <b>{locale === "vi" ? uiPreferences.soundEnabled ? "BẬT" : "TẮT" : uiPreferences.soundEnabled ? "ON" : "OFF"}</b>
+              </button>
+              <label className={`volume-control ${uiPreferences.soundEnabled ? "" : "muted"}`}>
+                <span aria-hidden="true">♫</span>
+                <input
+                  type="range"
+                  min={appConfig.audio.minimumVolume}
+                  max={appConfig.audio.maximumVolume}
+                  step={appConfig.audio.volumeStep}
+                  value={uiPreferences.musicVolume}
+                  onChange={changeMusicVolume}
+                  aria-label={locale === "vi" ? "Âm lượng nhạc nền" : "Background music volume"}
+                />
+                <output>{uiPreferences.soundEnabled ? `${Math.round(uiPreferences.musicVolume * 100)}%` : locale === "vi" ? "TẮT" : "OFF"}</output>
+              </label>
+            </div>
+            <button
+              className="language-switch"
+              onClick={toggleLocale}
+              aria-label="Switch language"
+            >
+              <span className={locale === "vi" ? "active" : ""}>VI</span>
+              <i />
+              <span className={locale === "en" ? "active" : ""}>EN</span>
+            </button>
+          </nav>
         </div>
-        <div
-          className="rank-chip"
-          aria-label={`${text.reputation}: ${progress.reputation}`}
-        >
-          <small>{rankProgress.current.label[locale]}</small>
-          <strong>{progress.reputation} REP</strong>
-        </div>
-        <div
-          className="points-wallet"
-          aria-label={`${text.points}: ${progress.pointBalance}`}
-        >
-          <small>{text.points}</small>
-          <strong>{progress.pointBalance}</strong>
-          <span>PTS</span>
-        </div>
-        <button
-          className="utility-button"
-          onClick={() => setShowOnboarding(true)}
-          aria-label={locale === "vi" ? "Mở hướng dẫn" : "Open tutorial"}
-        >
-          ?
-        </button>
-        <button
-          className="utility-button sound-toggle"
-          onClick={toggleSound}
-          aria-label={
-            locale === "vi" ? "Bật hoặc tắt âm thanh" : "Toggle sound"
-          }
-          aria-pressed={uiPreferences.soundEnabled}
-        >
-          {uiPreferences.soundEnabled ? "◖))" : "◖×"}
-        </button>
-        <button
-          className="language-switch"
-          onClick={toggleLocale}
-          aria-label="Switch language"
-        >
-          <span className={locale === "vi" ? "active" : ""}>VI</span>
-          <i />
-          <span className={locale === "en" ? "active" : ""}>EN</span>
-        </button>
       </header>
 
       <section className="case-strip">

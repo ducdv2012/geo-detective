@@ -10,7 +10,10 @@ type ToneOptions = {
   type?: OscillatorType;
 };
 
-export function useSoundEffects(enabled: boolean) {
+export function useSoundEffects(
+  enabled: boolean,
+  musicVolume: number = appConfig.audio.defaultMusicVolume,
+) {
   const contextRef = useRef<AudioContext | null>(null);
   const soundtrackTimerRef = useRef<number | null>(null);
   const soundtrackDayRef = useRef(1);
@@ -63,6 +66,14 @@ export function useSoundEffects(enabled: boolean) {
         endFrequency,
         type = "sine",
       } = options;
+      const effectiveGain = ambient
+        ? gain *
+          appConfig.audio.musicGainMultiplier *
+          Math.min(
+            appConfig.audio.maximumVolume,
+            Math.max(appConfig.audio.minimumVolume, musicVolume),
+          )
+        : gain;
       const beginsAt = context.currentTime + start;
       const oscillator = context.createOscillator();
       const volume = context.createGain();
@@ -75,7 +86,7 @@ export function useSoundEffects(enabled: boolean) {
         );
       volume.gain.setValueAtTime(0.0001, beginsAt);
       volume.gain.linearRampToValueAtTime(
-        gain,
+        effectiveGain,
         beginsAt + Math.min(attack, duration * 0.45),
       );
       volume.gain.exponentialRampToValueAtTime(0.0001, beginsAt + duration);
@@ -84,7 +95,7 @@ export function useSoundEffects(enabled: boolean) {
       oscillator.start(beginsAt);
       oscillator.stop(beginsAt + duration);
     },
-    [enabled, ensureContext, trackSource],
+    [enabled, ensureContext, musicVolume, trackSource],
   );
 
   const noiseBurst = useCallback(
@@ -99,6 +110,14 @@ export function useSoundEffects(enabled: boolean) {
       const context = ensureContext();
       if (!context) return;
       const beginsAt = context.currentTime + start;
+      const effectiveGain = ambient
+        ? gain *
+          appConfig.audio.musicGainMultiplier *
+          Math.min(
+            appConfig.audio.maximumVolume,
+            Math.max(appConfig.audio.minimumVolume, musicVolume),
+          )
+        : gain;
       const frameCount = Math.max(1, Math.ceil(context.sampleRate * duration));
       const buffer = context.createBuffer(1, frameCount, context.sampleRate);
       const channel = buffer.getChannelData(0);
@@ -111,14 +130,14 @@ export function useSoundEffects(enabled: boolean) {
       source.buffer = buffer;
       filter.type = "highpass";
       filter.frequency.setValueAtTime(filterFrequency, beginsAt);
-      volume.gain.setValueAtTime(gain, beginsAt);
+      volume.gain.setValueAtTime(effectiveGain, beginsAt);
       volume.gain.exponentialRampToValueAtTime(0.0001, beginsAt + duration);
       source.connect(filter).connect(volume).connect(context.destination);
       trackSource(source, ambient);
       source.start(beginsAt);
       source.stop(beginsAt + duration);
     },
-    [enabled, ensureContext, trackSource],
+    [enabled, ensureContext, musicVolume, trackSource],
   );
 
   const stopInvestigation = useCallback(() => {
@@ -247,6 +266,32 @@ export function useSoundEffects(enabled: boolean) {
   const unlock = useCallback(() => {
     void ensureContext();
   }, [ensureContext]);
+  const playSoundCheck = useCallback(
+    (level = musicVolume) => {
+      const context = ensureContext();
+      if (!context) return;
+      const previewGain =
+        0.055 *
+        Math.min(
+          appConfig.audio.maximumVolume,
+          Math.max(appConfig.audio.minimumVolume, level),
+        );
+      [196, 293.66, 392].forEach((frequency, index) => {
+        const beginsAt = context.currentTime + index * 0.09;
+        const oscillator = context.createOscillator();
+        const volume = context.createGain();
+        oscillator.type = index === 0 ? "triangle" : "sine";
+        oscillator.frequency.setValueAtTime(frequency, beginsAt);
+        volume.gain.setValueAtTime(0.0001, beginsAt);
+        volume.gain.linearRampToValueAtTime(previewGain, beginsAt + 0.02);
+        volume.gain.exponentialRampToValueAtTime(0.0001, beginsAt + 0.32);
+        oscillator.connect(volume).connect(context.destination);
+        oscillator.start(beginsAt);
+        oscillator.stop(beginsAt + 0.34);
+      });
+    },
+    [ensureContext, musicVolume],
+  );
   const playCapture = useCallback(() => {
     stopInvestigation();
     tone(420, 0, 0.16, 0.035, { type: "square" });
@@ -275,6 +320,7 @@ export function useSoundEffects(enabled: boolean) {
 
   return {
     unlock,
+    playSoundCheck,
     startInvestigation,
     stopInvestigation,
     playCapture,

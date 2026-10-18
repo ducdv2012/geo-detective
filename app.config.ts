@@ -71,7 +71,6 @@ export const appConfig = {
   },
   career: {
     dailyReputationCaseLimit: 3,
-    defaultSoundEnabled: true,
     reputation: { base: 10, firstDayBonus: 5, noCluePurchaseBonus: 5 },
     ranks: [
       { id: "trainee", minimum: 0, label: { vi: "Tập sự", en: "Trainee" } },
@@ -102,6 +101,14 @@ export const appConfig = {
       },
     ],
     badgeThresholds: { winStreak: 3, regionWins: 5 },
+  },
+  audio: {
+    enabledByDefault: true,
+    defaultMusicVolume: 0.7,
+    musicGainMultiplier: 2.4,
+    minimumVolume: 0,
+    maximumVolume: 1,
+    volumeStep: 0.05,
   },
   social: {
     achievementFilename: "geo-detective-achievement.png",

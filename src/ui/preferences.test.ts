@@ -18,7 +18,16 @@ describe("UI preferences", () => {
       loadUiPreferences({
         getItem: () => JSON.stringify({ hasSeenOnboarding: true }),
       }),
-    ).toEqual({ hasSeenOnboarding: true, soundEnabled: true });
+    ).toEqual({
+      hasSeenOnboarding: true,
+      soundEnabled: true,
+      musicVolume: 0.7,
+    });
+    expect(
+      loadUiPreferences({
+        getItem: () => JSON.stringify({ musicVolume: 9 }),
+      }).musicVolume,
+    ).toBe(1);
     expect(loadUiPreferences({ getItem: () => "{broken" })).toEqual(
       defaultUiPreferences,
     );
@@ -28,11 +37,15 @@ describe("UI preferences", () => {
     const setItem = vi.fn();
     saveUiPreferences(
       { setItem },
-      { hasSeenOnboarding: true, soundEnabled: false },
+      { hasSeenOnboarding: true, soundEnabled: false, musicVolume: 0.25 },
     );
     expect(setItem).toHaveBeenCalledWith(
       UI_PREFERENCES_KEY,
-      JSON.stringify({ hasSeenOnboarding: true, soundEnabled: false }),
+      JSON.stringify({
+        hasSeenOnboarding: true,
+        soundEnabled: false,
+        musicVolume: 0.25,
+      }),
     );
   });
 });

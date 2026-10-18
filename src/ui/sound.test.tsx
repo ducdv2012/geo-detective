@@ -102,4 +102,12 @@ describe("investigation sound", () => {
       act(() => result.current.playClue());
     }).not.toThrow();
   });
+
+  it("plays an audible sound check while enabling previously muted audio", () => {
+    const { AudioContextMock, context } = installAudioContext();
+    const { result } = renderHook(() => useSoundEffects(false, 0.5));
+    act(() => result.current.playSoundCheck(0.5));
+    expect(AudioContextMock).toHaveBeenCalledOnce();
+    expect(context.createOscillator).toHaveBeenCalledTimes(3);
+  });
 });

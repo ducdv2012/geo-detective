@@ -83,4 +83,19 @@ describe("App onboarding and evidence focus", () => {
     expect(document.activeElement).not.toBe(screen.getByRole("textbox"));
     expect(evidence.scrollIntoView).toHaveBeenCalled();
   });
+
+  it("persists the background music volume", () => {
+    localStorage.setItem(
+      UI_PREFERENCES_KEY,
+      JSON.stringify({ hasSeenOnboarding: true, soundEnabled: false }),
+    );
+    render(<App />);
+    const slider = screen.getByRole("slider", { name: "Âm lượng nhạc nền" });
+    expect(slider).toHaveValue("0.7");
+    fireEvent.change(slider, { target: { value: "0.25" } });
+    expect(slider).toHaveValue("0.25");
+    expect(
+      JSON.parse(localStorage.getItem(UI_PREFERENCES_KEY) ?? "{}"),
+    ).toMatchObject({ musicVolume: 0.25, soundEnabled: true });
+  });
 });

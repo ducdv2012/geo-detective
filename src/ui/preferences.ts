@@ -5,12 +5,23 @@ export const UI_PREFERENCES_KEY: string = appConfig.storage.uiPreferences;
 export interface UiPreferences {
   hasSeenOnboarding: boolean;
   soundEnabled: boolean;
+  musicVolume: number;
 }
 
 export const defaultUiPreferences: UiPreferences = {
   hasSeenOnboarding: false,
-  soundEnabled: appConfig.career.defaultSoundEnabled,
+  soundEnabled: appConfig.audio.enabledByDefault,
+  musicVolume: appConfig.audio.defaultMusicVolume,
 };
+
+function sanitizeVolume(value: unknown): number {
+  const volume = Number(value);
+  if (!Number.isFinite(volume)) return appConfig.audio.defaultMusicVolume;
+  return Math.min(
+    appConfig.audio.maximumVolume,
+    Math.max(appConfig.audio.minimumVolume, volume),
+  );
+}
 
 export function loadUiPreferences(
   storage: Pick<Storage, "getItem">,
@@ -23,6 +34,7 @@ export function loadUiPreferences(
     return {
       hasSeenOnboarding: parsed.hasSeenOnboarding === true,
       soundEnabled: parsed.soundEnabled !== false,
+      musicVolume: sanitizeVolume(parsed.musicVolume),
     };
   } catch {
     return defaultUiPreferences;
