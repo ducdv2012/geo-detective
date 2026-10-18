@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useReducer, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react'
 import { difficultyLabels, dossiers } from './data/dossiers'
 import { generateUniquePuzzle, seededRandom } from './game/puzzle'
 import {
@@ -11,8 +11,13 @@ import { copy, formatClue, formatWeather, interpolate } from './i18n'
 import { loadCountries } from './services/countries'
 import { fetchWeather } from './services/weather'
 import type { CaseRound, Country, Locale, PenaltyResult, RecoveryResult, ScoreResult } from './types'
+import { Onboarding } from './components/Onboarding'
+import { OutcomeCinematic, type CinematicKind } from './components/OutcomeCinematic'
+import { loadUiPreferences, saveUiPreferences } from './ui/preferences'
+import { useSoundEffects } from './ui/sound'
 
 type DataSource = 'cache' | 'network' | 'fallback'
+type CinematicState = { kind: CinematicKind; final: boolean; country: string }
 
 const icons = [
   <svg viewBox="0 0 48 48" aria-hidden="true"><path d="M8 34c8-7 13-15 16-24 4 7 9 14 16 22-8 5-24 7-32 2Z"/><path d="M18 34c1-5 4-10 8-14M14 28c7 1 13 0 19-3"/></svg>,
@@ -37,7 +42,14 @@ function App() {
   const [scoreResult, setScoreResult] = useState<ScoreResult | null>(null)
   const [penaltyResult, setPenaltyResult] = useState<PenaltyResult | null>(null)
   const [recoveryResult, setRecoveryResult] = useState<RecoveryResult | null>(null)
+  const [uiPreferences, setUiPreferences] = useState(() => loadUiPreferences(localStorage))
+  const [showOnboarding, setShowOnboarding] = useState(() => !loadUiPreferences(localStorage).hasSeenOnboarding)
+  const [cinematic, setCinematic] = useState<CinematicState | null>(null)
   const randomRef = useRef(seededRandom(Date.now()))
+  const evidenceHeadingRef = useRef<HTMLHeadingElement>(null)
+  const resultHeadingRef = useRef<HTMLHeadingElement>(null)
+  const resolvingRef = useRef(false)
+  const { unlock: unlockSound, playCapture, playEscape } = useSoundEffects(uiPreferences.soundEnabled)
   const text = copy[locale]
   const recoveryActive = state.status === 'briefing' ? progress.recoveryRequired : state.isRecovery
   const activeDossierIndex = recoveryActive ? progress.recoveryDossierIndex : selectedDossierIndex
@@ -68,6 +80,20 @@ function App() {
     return () => { active = false }
   }, [state.round?.target.code, state.round?.weather])
 
+  useEffect(() => {
+    if (showOnboarding || cinematic) return
+    const target = state.status === 'investigating' ? evidenceHeadingRef.current
+      : state.status === 'won' || state.status === 'lost' ? resultHeadingRef.current
+        : null
+    if (!target) return
+    const frame = window.requestAnimationFrame(() => {
+      const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+      target.focus({ preventScroll: true })
+      target.scrollIntoView({ behavior: reduced ? 'auto' : 'smooth', block: 'start' })
+    })
+    return () => window.cancelAnimationFrame(frame)
+  }, [state.status, state.round?.day, showOnboarding, cinematic])
+
   const makeRound = (day: number, excludedCodes: string[] = [], recovery = recoveryActive): CaseRound =>
     generateUniquePuzzle(
       countries,
@@ -80,6 +106,7 @@ function App() {
 
   const startGame = () => {
     if (countries.length < 8) return
+    unlockSound()
     setSelected('')
     setQuery('')
     setNotice('')
@@ -90,12 +117,20 @@ function App() {
   }
 
   const submitGuess = () => {
-    if (!state.round) return
+    if (!state.round || resolvingRef.current) return
     if (!selected) {
       setNotice(text.selectPrompt)
       return
     }
     const correct = selected === state.round.target.code
+    resolvingRef.current = true
+    setCinematic({
+      kind: correct ? 'capture' : 'escape',
+      final: correct || state.round.day >= 3,
+      country: state.round.target.name[locale],
+    })
+    if (correct) playCapture()
+    else playEscape()
     if (correct) {
       if (state.isRecovery) {
         const outcome = applyRecoveryWin(progress, dossier, state.round.day, state.round.target.region)
@@ -144,6 +179,30 @@ function App() {
     setLocale((current) => current === 'vi' ? 'en' : 'vi')
     setNotice('')
   }
+
+  const closeOnboarding = useCallback(() => {
+    setShowOnboarding(false)
+    unlockSound()
+    setUiPreferences((current) => {
+      const updated = { ...current, hasSeenOnboarding: true }
+      saveUiPreferences(localStorage, updated)
+      return updated
+    })
+  }, [unlockSound])
+
+  const toggleSound = () => {
+    setUiPreferences((current) => {
+      const updated = { ...current, soundEnabled: !current.soundEnabled }
+      saveUiPreferences(localStorage, updated)
+      return updated
+    })
+    if (!uiPreferences.soundEnabled) unlockSound()
+  }
+
+  const finishCinematic = useCallback(() => {
+    resolvingRef.current = false
+    setCinematic(null)
+  }, [])
 
   const sourceLabel = source === 'network' ? text.dataNetwork : source === 'cache' ? text.dataCache : text.dataFallback
 
@@ -199,6 +258,10 @@ function App() {
         <div className="points-wallet" aria-label={`${text.points}: ${progress.pointBalance}`}>
           <small>{text.points}</small><strong>{progress.pointBalance}</strong><span>PTS</span>
         </div>
+        <button className="utility-button" onClick={() => setShowOnboarding(true)} aria-label={locale === 'vi' ? 'Mở hướng dẫn' : 'Open tutorial'}>?</button>
+        <button className="utility-button sound-toggle" onClick={toggleSound} aria-label={locale === 'vi' ? 'Bật hoặc tắt âm thanh' : 'Toggle sound'} aria-pressed={uiPreferences.soundEnabled}>
+          {uiPreferences.soundEnabled ? '◖))' : '◖×'}
+        </button>
         <button className="language-switch" onClick={toggleLocale} aria-label="Switch language">
           <span className={locale === 'vi' ? 'active' : ''}>VI</span><i /><span className={locale === 'en' ? 'active' : ''}>EN</span>
         </button>
@@ -320,7 +383,7 @@ function App() {
 
           <div className="board-grid">
             <section className="evidence-board">
-              <div className="section-heading"><span>01</span><h2>{text.evidence}</h2></div>
+              <div className="section-heading"><span>01</span><h2 ref={evidenceHeadingRef} tabIndex={-1}>{text.evidence}</h2></div>
               <div className="clue-list">
                 {state.round.clues.slice(0, maxClues).map((clue, index) => {
                   const clueNumber = index + 1
@@ -401,7 +464,7 @@ function App() {
           <div className="result-stamp">{state.isRecovery ? 'RECOVERY' : state.status === 'won' ? 'CLOSED' : 'COLD CASE'}</div>
           <span className="result-flag">{state.round.target.flag}</span>
           <p className="kicker">{caseLabel}</p>
-          <h2>{state.isRecovery
+          <h2 ref={resultHeadingRef} tabIndex={-1}>{state.isRecovery
             ? state.status === 'won' ? text.recoveryWonTitle : text.recoveryLostTitle
             : state.status === 'won' ? text.wonTitle : text.lostTitle}
           </h2>
@@ -475,6 +538,18 @@ function App() {
           </div>
         </section>
       )}
+
+      {cinematic && (
+        <OutcomeCinematic
+          kind={cinematic.kind}
+          final={cinematic.final}
+          locale={locale}
+          country={cinematic.country}
+          onComplete={finishCinematic}
+        />
+      )}
+
+      {showOnboarding && <Onboarding locale={locale} onToggleLocale={toggleLocale} onClose={closeOnboarding} />}
 
       <footer><span>© 2026 GEO-DETECTIVE</span><span>{text.footer}</span></footer>
     </main>
