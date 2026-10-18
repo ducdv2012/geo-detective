@@ -13,12 +13,17 @@ export function getPublicGameUrl(
   locationHref = window.location.href,
 ): string | null {
   const configured = appConfig.site.publicUrl.trim();
-  if (configured) return configured.replace(/\/$/, "");
+  if (configured) {
+    const url = new URL(configured);
+    url.searchParams.set("share", appConfig.site.shareVersion);
+    return url.toString();
+  }
   try {
     const url = new URL(locationHref);
     const localHosts = new Set(["localhost", "127.0.0.1", "0.0.0.0"]);
     if (localHosts.has(url.hostname) || url.protocol !== "https:") return null;
-    return `${url.origin}${url.pathname}`.replace(/\/$/, "");
+    url.searchParams.set("share", appConfig.site.shareVersion);
+    return url.toString();
   } catch {
     return null;
   }

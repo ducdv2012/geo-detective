@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildShareCaption } from "./socialShare";
+import { buildShareCaption, getPublicGameUrl } from "./socialShare";
 
 describe("social achievement caption", () => {
   it("includes rank, reputation, badges and campaign hashtags in Vietnamese", () => {
@@ -34,5 +34,11 @@ describe("social achievement caption", () => {
       "https://geo-detective.example",
     );
     expect(caption).toContain("Chơi ngay: https://geo-detective.example");
+  });
+
+  it("uses the canonical deployment and a fresh Facebook cache key", () => {
+    expect(getPublicGameUrl()).toBe(
+      "https://atlas-noir.vercel.app/?share=badges-v3",
+    );
   });
 });

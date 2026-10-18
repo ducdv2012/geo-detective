@@ -20,10 +20,11 @@ export const appConfig = {
     socialImageAlt:
       "Geo-Detective — ba huy hiệu thành tích Mắt Đại Bàng, Suy Luận Thuần Túy và Trở Lại Từ Bóng Tối",
     twitterDescription: "Bạn có thể phá án trước khi mục tiêu biến mất không?",
-    publicUrl: "https://carte-noir.vercel.app",
+    publicUrl: "https://atlas-noir.vercel.app",
+    shareVersion: "badges-v3",
     themeColor: "#10100f",
     faviconPath: "/favicon.svg",
-    socialImagePath: "/geo-detective-achievements-v2.png",
+    socialImagePath: "/geo-detective-achievements-v2.png?v=3",
     copyrightYear: 2026,
   },
   data: {
