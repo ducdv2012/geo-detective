@@ -49,7 +49,14 @@ function App() {
   const evidenceHeadingRef = useRef<HTMLHeadingElement>(null)
   const resultHeadingRef = useRef<HTMLHeadingElement>(null)
   const resolvingRef = useRef(false)
-  const { unlock: unlockSound, playCapture, playEscape } = useSoundEffects(uiPreferences.soundEnabled)
+  const {
+    unlock: unlockSound,
+    startInvestigation: startInvestigationSound,
+    stopInvestigation: stopInvestigationSound,
+    playCapture,
+    playEscape,
+    playClue,
+  } = useSoundEffects(uiPreferences.soundEnabled)
   const text = copy[locale]
   const recoveryActive = state.status === 'briefing' ? progress.recoveryRequired : state.isRecovery
   const activeDossierIndex = recoveryActive ? progress.recoveryDossierIndex : selectedDossierIndex
@@ -94,6 +101,23 @@ function App() {
     return () => window.cancelAnimationFrame(frame)
   }, [state.status, state.round?.day, showOnboarding, cinematic])
 
+  useEffect(() => {
+    if (state.status === 'investigating' && state.round && !cinematic && !showOnboarding) {
+      startInvestigationSound(state.round.day)
+    } else {
+      stopInvestigationSound()
+    }
+    return stopInvestigationSound
+  }, [
+    state.status,
+    state.round?.day,
+    cinematic,
+    showOnboarding,
+    uiPreferences.soundEnabled,
+    startInvestigationSound,
+    stopInvestigationSound,
+  ])
+
   const makeRound = (day: number, excludedCodes: string[] = [], recovery = recoveryActive): CaseRound =>
     generateUniquePuzzle(
       countries,
@@ -106,7 +130,11 @@ function App() {
 
   const startGame = () => {
     if (countries.length < 8) return
-    unlockSound()
+    if (uiPreferences.soundEnabled) {
+      unlockSound()
+      // Start inside the click gesture so browser autoplay policies cannot delay the score.
+      startInvestigationSound(1)
+    }
     setSelected('')
     setQuery('')
     setNotice('')
@@ -182,13 +210,13 @@ function App() {
 
   const closeOnboarding = useCallback(() => {
     setShowOnboarding(false)
-    unlockSound()
+    if (uiPreferences.soundEnabled) unlockSound()
     setUiPreferences((current) => {
       const updated = { ...current, hasSeenOnboarding: true }
       saveUiPreferences(localStorage, updated)
       return updated
     })
-  }, [unlockSound])
+  }, [uiPreferences.soundEnabled, unlockSound])
 
   const toggleSound = () => {
     setUiPreferences((current) => {
@@ -219,6 +247,7 @@ function App() {
     setProgress(updated)
     saveProgress(localStorage, updated)
     dispatch({ type: 'BUY_CLUE', cost, maxClues })
+    playClue()
     setNotice('')
   }
 
